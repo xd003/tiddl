@@ -2,6 +2,7 @@ import os
 import typer
 import asyncio
 
+from datetime import datetime
 from pathlib import Path
 from logging import getLogger
 from rich.live import Live
@@ -35,6 +36,25 @@ download_command = typer.Typer(name="download")
 register_subcommands(download_command)
 
 log = getLogger(__name__)
+
+
+def _apply_mtime(
+    path: Path,
+    update_mtime: bool,
+    fav_mtime: bool,
+    fav_date_added: str | None,
+) -> None:
+    if update_mtime:
+        try:
+            os.utime(path, None)
+        except Exception:
+            log.warning(f"could not update mtime for {path}")
+    elif fav_mtime and fav_date_added:
+        try:
+            ts = datetime.fromisoformat(fav_date_added).timestamp()
+            os.utime(path, (ts, ts))
+        except Exception:
+            log.warning(f"could not set fav mtime for {path}")
 
 
 @download_command.callback(no_args_is_help=True)
@@ -240,6 +260,7 @@ def download_callback(
                 item: Track | Video,
                 file_path: str,
                 track_metadata: Metadata | None = None,
+                fav_date_added: str | None = None,
             ) -> tuple[Path | None, Track | Video]:
                 log.debug(f"{item.id=}, {file_path=}")
                 rich_output.total_increment()
@@ -301,15 +322,17 @@ def download_callback(
                     elif isinstance(item, Video):
                         add_video_metadata(path=download_path, video=item, list_separator=CONFIG.download.list_separator)
 
-                if download_path and CONFIG.download.update_mtime:
-                    try:
-                        os.utime(download_path, None)
-                    except Exception:
-                        log.warning(f"could not update mtime for {download_path}")
+                if download_path:
+                    _apply_mtime(
+                        download_path,
+                        update_mtime=CONFIG.download.update_mtime,
+                        fav_mtime=CONFIG.download.fav_mtime,
+                        fav_date_added=fav_date_added,
+                    )
 
                 return download_path, item
 
-            async def download_album(album: Album):
+            async def download_album(album: Album, fav_date_added: str | None = None):
                 offset = 0
                 futures = []
 
@@ -366,6 +389,7 @@ def download_callback(
                                         credits=album_item.credits,
                                         album_review=album_review,
                                     ),
+                                    fav_date_added=fav_date_added,
                                 )
                             )
                         except ApiError as e:
@@ -440,6 +464,7 @@ def download_callback(
                             artist=album.artist.name if album.artist else "",
                             # credits are missing
                         ),
+                        fav_date_added=resource.fav_date_added,
                     )
 
                     if (
@@ -479,6 +504,7 @@ def download_callback(
                             quality=get_item_quality(video),
                             list_separator=CONFIG.download.list_separator,
                         ),
+                        fav_date_added=resource.fav_date_added,
                     )
 
                 case "mix":
@@ -547,7 +573,7 @@ def download_callback(
 
                 case "album":
                     album = ctx.obj.api.get_album(album_id=resource.id)
-                    await download_album(album)
+                    await download_album(album, fav_date_added=resource.fav_date_added)
 
                 case "artist":
                     futures = []
