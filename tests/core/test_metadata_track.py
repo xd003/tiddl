@@ -25,7 +25,7 @@ def test_add_track_metadata_keeps_primary_artist_first(monkeypatch):
     monkeypatch.setattr(
         track_metadata,
         "add_flac_metadata",
-        lambda path, metadata: captured.append(metadata),
+        lambda path, metadata, **_: captured.append(metadata),
     )
 
     track_metadata.add_track_metadata(Path("song.flac"), track)
@@ -57,7 +57,7 @@ def test_add_track_metadata_preserves_artist_order_without_primary(monkeypatch):
     monkeypatch.setattr(
         track_metadata,
         "add_flac_metadata",
-        lambda path, metadata: captured.append(metadata),
+        lambda path, metadata, **_: captured.append(metadata),
     )
 
     track_metadata.add_track_metadata(Path("song.flac"), track)
