@@ -150,7 +150,7 @@ class FavoriteVideosItems(Items):
 
 class TrackStream(BaseModel):
     trackId: int
-    assetPresentation: Literal["FULL"]
+    assetPresentation: Literal["FULL", "PREVIEW"]
     audioMode: Literal["STEREO", "DOLBY_ATMOS"]
     audioQuality: TrackQuality
     manifestMimeType: Literal["application/dash+xml", "application/vnd.tidal.bts"]
@@ -167,7 +167,7 @@ class TrackStream(BaseModel):
 class VideoStream(BaseModel):
     videoId: int
     streamType: Literal["ON_DEMAND"]
-    assetPresentation: Literal["FULL"]
+    assetPresentation: Literal["FULL", "PREVIEW"]
     videoQuality: StreamVideoQuality
     # streamingSessionId: str  # only in web?
     manifestMimeType: Literal["application/dash+xml", "application/vnd.tidal.emu"]

@@ -8,6 +8,7 @@ from tiddl.core.api.api import (
     DO_NOT_CACHE,
     EXPIRE_IMMEDIATELY,
 )
+from tiddl.core.api.exceptions import ApiError
 
 from tiddl.core.api.models import (
     Album,
@@ -177,6 +178,7 @@ def test_get_track(api: TidalAPI, mock_client: MockType):
 
 
 def test_get_track_stream(api: TidalAPI, mock_client: MockType):
+    mock_client.fetch.return_value.assetPresentation = "FULL"
     api.get_track_stream(1, "HIGH")
     mock_client.fetch.assert_called_once_with(
         TrackStream,
@@ -197,6 +199,7 @@ def test_get_video(api: TidalAPI, mock_client: MockType):
 
 
 def test_get_video_stream(api: TidalAPI, mock_client: MockType):
+    mock_client.fetch.return_value.assetPresentation = "FULL"
     api.get_video_stream(1, "HIGH")
     mock_client.fetch.assert_called_once_with(
         VideoStream,
@@ -204,3 +207,14 @@ def test_get_video_stream(api: TidalAPI, mock_client: MockType):
         {"videoquality": "HIGH", "playbackmode": "STREAM", "assetpresentation": "FULL"},
         expire_after=DO_NOT_CACHE,
     )
+
+
+@pytest.mark.parametrize(
+    "get_stream", [TidalAPI.get_track_stream, TidalAPI.get_video_stream]
+)
+def test_preview_stream_raises_api_error(
+    api: TidalAPI, mock_client: MockType, get_stream
+):
+    mock_client.fetch.return_value.assetPresentation = "PREVIEW"
+    with pytest.raises(ApiError, match="30-second preview"):
+        get_stream(api, 1, "HIGH")

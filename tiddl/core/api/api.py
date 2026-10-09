@@ -3,6 +3,7 @@ from typing import Literal, TypeAlias
 from requests_cache import DO_NOT_CACHE, EXPIRE_IMMEDIATELY
 
 from .client import TidalClient
+from .exceptions import ApiError
 from .models.base import (
     AlbumItems,
     AlbumItemsCredits,
@@ -30,6 +31,21 @@ from .models.resources import (
     Video,
 )
 from .models.review import AlbumReview
+
+
+def _require_full_presentation(stream: TrackStream | VideoStream) -> None:
+    # TIDAL answers a FULL request with a ~30 s PREVIEW clip when the account
+    # has no playback entitlement (e.g. a FREE / lapsed subscription).
+    if stream.assetPresentation != "FULL":
+        raise ApiError(
+            status=403,
+            subStatus=stream.assetPresentation,
+            userMessage=(
+                "TIDAL returned only a 30-second preview; the account has no "
+                "active paid subscription"
+            ),
+        )
+
 
 ID: TypeAlias = str | int
 
@@ -277,7 +293,7 @@ class TidalAPI:
         )
 
     def get_track_stream(self, track_id: ID, quality: TrackQuality):
-        return self.client.fetch(
+        stream = self.client.fetch(
             TrackStream,
             f"tracks/{track_id}/playbackinfopostpaywall",
             {
@@ -287,6 +303,8 @@ class TidalAPI:
             },
             expire_after=DO_NOT_CACHE,
         )
+        _require_full_presentation(stream)
+        return stream
 
     def get_video(self, video_id: ID):
         return self.client.fetch(
@@ -297,7 +315,7 @@ class TidalAPI:
         )
 
     def get_video_stream(self, video_id: ID, quality: StreamVideoQuality):
-        return self.client.fetch(
+        stream = self.client.fetch(
             VideoStream,
             f"videos/{video_id}/playbackinfopostpaywall",
             {
@@ -307,3 +325,5 @@ class TidalAPI:
             },
             expire_after=DO_NOT_CACHE,
         )
+        _require_full_presentation(stream)
+        return stream
