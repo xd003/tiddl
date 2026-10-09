@@ -1,4 +1,5 @@
 import base64
+import json
 import logging
 from os import environ
 from requests import request
@@ -35,6 +36,28 @@ def get_auth_credentials() -> tuple[str, str]:
 
 AUTH_URL = "https://auth.tidal.com/v1/oauth2"
 CLIENT_ID, CLIENT_SECRET = get_auth_credentials()
+
+
+def granted_scope(refresh_token: str, requested_scope: str) -> str:
+    """Narrow ``requested_scope`` to the scopes ``refresh_token`` was issued with.
+
+    TIDAL rejects a refresh that asks for any scope the original grant lacked
+    (e.g. ``w_sub`` for a token issued as ``r_usr w_usr``), so requesting a fixed
+    superset breaks tokens minted by other clients. The grant is read from the
+    token's JWT ``scope`` claim; an undecodable token keeps the requested scope.
+    """
+    try:
+        payload = refresh_token.split(".")[1]
+        claims = json.loads(
+            base64.urlsafe_b64decode(payload + "=" * (-len(payload) % 4))
+        )
+        granted = set(str(claims["scope"]).split())
+    except Exception:
+        return requested_scope
+
+    scopes = [s for s in requested_scope.split("+") if s in granted]
+    return "+".join(scopes) if scopes else requested_scope
+
 
 JSON: TypeAlias = dict[str, Any]
 
@@ -90,7 +113,7 @@ class AuthClient:
             "client_id": self.client_id,
             "refresh_token": refresh_token,
             "grant_type": "refresh_token",
-            "scope": self.refresh_scope,
+            "scope": granted_scope(refresh_token, self.refresh_scope),
         }
 
         if self.refresh_with_basic_auth:

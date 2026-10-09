@@ -144,6 +144,36 @@ def test_refresh_token_supports_form_client_secret_and_custom_scope(
     )
 
 
+def _jwt(claims: dict) -> str:
+    import base64
+    import json
+
+    payload = base64.urlsafe_b64encode(json.dumps(claims).encode()).decode().rstrip("=")
+    return f"header.{payload}.signature"
+
+
+def test_refresh_token_narrows_scope_to_token_grant(mocker: MockerFixture):
+    mock_request = mocker.patch("tiddl.core.auth.client.request")
+    mock_request.return_value = mocker.Mock()
+    refresh_token = _jwt({"type": "o2_refresh", "scope": "r_usr w_usr"})
+
+    client = AuthClient()
+    client.refresh_token(refresh_token)
+
+    assert mock_request.call_args.kwargs["data"]["scope"] == "r_usr+w_usr"
+
+
+def test_refresh_token_keeps_scope_the_token_grants(mocker: MockerFixture):
+    mock_request = mocker.patch("tiddl.core.auth.client.request")
+    mock_request.return_value = mocker.Mock()
+    refresh_token = _jwt({"type": "o2_refresh", "scope": "r_usr w_usr w_sub"})
+
+    client = AuthClient()
+    client.refresh_token(refresh_token)
+
+    assert mock_request.call_args.kwargs["data"]["scope"] == "r_usr+w_usr+w_sub"
+
+
 def test_logout_token(mocker: MockerFixture):
     mock_request = mocker.patch("tiddl.core.auth.client.request")
 
